@@ -1778,6 +1778,15 @@ export class QuotePlugin {
           };
           logger.warn("quote webm send options", { bytes: result.image.length, mimeType: sendOptions.mimeType, width, height, duration });
           await withTimeout(sendClient.sendMedia(msg.chat.id, sendOptions), QUOTE_RPC_TIMEOUT_MS, "main.send_reply");
+        } else if (result.ext === "webp") {
+          const sendOptions: any = {
+            type: "sticker",
+            file: output,
+            fileMime: "image/webp",
+            alt: args.emojiSuffix || "💜",
+            replyTo: replyTargetId,
+          };
+          await withTimeout(sendClient.sendMedia(msg.chat.id, sendOptions), QUOTE_RPC_TIMEOUT_MS, "main.send_reply");
         } else {
           const sendOptions: any = {
             type: "photo",
