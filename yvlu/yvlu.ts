@@ -795,7 +795,7 @@ class YvluPlugin extends Plugin {
           const client = await getGlobalClient();
 
           const messages = await safeGetMessages(msg.client, msg.chat, {
-            offsetId: replied!.id - 1,
+            offsetId: replied!.id,
             limit: count,
             reverse: true,
           });
