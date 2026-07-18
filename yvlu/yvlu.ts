@@ -869,7 +869,8 @@ class YvluPlugin extends Plugin {
             const lastName = senderLike.lastName || "";
             const username = senderLike.username || "";
             const emojiStatus =
-              (sender as unknown as { emojiStatus?: { documentId?: { toString(): string } } }).emojiStatus?.documentId?.toString() || null;
+              ((sender as unknown as { emojiStatus?: { documentId?: any; emoji?: any } })?.emojiStatus?.documentId
+                ?? (sender as unknown as { emojiStatus?: { documentId?: any; emoji?: any } })?.emojiStatus?.emoji)?.toString() || null;
 
             // 生成用户唯一标识符：优先使用 userId，如果没有则使用名称的 hashCode
             const currentUserIdentifier =
@@ -1118,8 +1119,8 @@ class YvluPlugin extends Plugin {
                 username:
                   photo && shouldShowAvatar ? username || undefined : undefined,
                 photo,
-                emoji_status: shouldShowAvatar
-                  ? emojiStatus || undefined
+                emoji_status: shouldShowAvatar && emojiStatus
+                  ? { custom_emoji_id: String(emojiStatus) }
                   : undefined,
               },
               text: fabricateText && i === 0 ? fabricateText : (message.text || ""),

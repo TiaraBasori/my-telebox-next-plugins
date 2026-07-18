@@ -649,7 +649,7 @@ function emojiStatusIdFromEntity(entity: unknown): string | undefined {
     return id ? String(id) : undefined;
   }
   const statusObj = status as Record<string, unknown>;
-  const documentId = statusObj.documentId ?? statusObj.document_id ?? statusObj.customEmojiId ?? statusObj.custom_emoji_id ?? statusObj.id;
+  const documentId = statusObj.emoji ?? statusObj.documentId ?? statusObj.document_id ?? statusObj.customEmojiId ?? statusObj.custom_emoji_id ?? statusObj.id;
   if (!documentId) return undefined;
   return String(documentId);
 }
@@ -756,7 +756,7 @@ function messageText(msg: MessageContext): string {
 function convertEntities(msg: MessageContext): any[] {
   // Merge message entities with caption entities to capture formatting
   // on media message captions (which some API layers expose separately).
-  const msgEntities = (msg.entities as unknown as Array<{ className?: string; constructor?: { name?: string }; offset?: number; length?: number; language?: string; url?: string; userId?: number; documentId?: string | number; document_id?: string | number }>) ?? [];
+  const msgEntities = (msg.entities as unknown as Array<{ className?: string; constructor?: { name?: string }; offset?: number; length?: number; language?: string; url?: string; userId?: number; documentId?: string | number; document_id?: string | number; emojiId?: string | number }>) ?? [];
   const raw = msg.raw as unknown as Record<string, unknown> | undefined;
   const capEntities = (raw?.captionEntities ?? raw?.caption_entities ?? []) as typeof msgEntities;
   const all = msgEntities.length > 0 || capEntities.length > 0 ? [...msgEntities, ...capEntities] : msgEntities;
@@ -781,7 +781,7 @@ function convertEntities(msg: MessageContext): any[] {
     if (name.includes("Url")) return { type: "url", offset, length };
     if (name.includes("Email")) return { type: "email", offset, length };
     if (name.includes("Phone")) return { type: "phone_number", offset, length };
-    if (name.includes("CustomEmoji")) return { type: "custom_emoji", offset, length, custom_emoji_id: String(e.documentId ?? e.document_id ?? "") };
+    if (name.includes("CustomEmoji")) return { type: "custom_emoji", offset, length, custom_emoji_id: String(e.emojiId ?? e.documentId ?? e.document_id ?? "") };
     return { type: "text", offset, length };
   }).filter((e) => e.length > 0 && e.type !== "text");
 }
