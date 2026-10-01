@@ -369,13 +369,13 @@ function getCommandArgsText(msg: MessageContext, command: string): string {
 
 const QUOTE_EMOJI_BRANDS = new Set(["apple", "google", "twitter", "joypixels", "blob"]);
 
-function isColorToken(arg: string): boolean {
+function isColorToken(arg: string, allowBare = true): boolean {
   if (!arg) return false;
   const lower = arg.toLowerCase();
-  if (lower === "random") return true;
+  if (lower === "random") return allowBare;
   if (/^#([0-9a-f]{3}|[0-9a-f]{6})(\/#([0-9a-f]{3}|[0-9a-f]{6}))?$/i.test(arg)) return true;
   if (/^\/\/#?([0-9a-f]{3}|[0-9a-f]{6})$/i.test(arg)) return true;
-  if (/^([0-9a-f]{3}|[0-9a-f]{6})(\/([0-9a-f]{3}|[0-9a-f]{6}))?$/i.test(arg)) return true;
+  if (allowBare && /^([0-9a-f]{3}|[0-9a-f]{6})(\/([0-9a-f]{3}|[0-9a-f]{6}))?$/i.test(arg)) return true;
   return false;
 }
 
@@ -391,7 +391,14 @@ function normalizeColorToken(arg: string): string {
 }
 
 function parseArgs(text: string): QuoteArgs {
-  const args = text.trim().split(/\s+/).filter(Boolean);
+  const src = text.trim();
+  // 记录 token 在原文中的位置：造谣正文按原文截取，保留换行与连续空格
+  const tokens = Array.from(src.matchAll(/\S+/g));
+  const args = tokens.map((m) => m[0]);
+  const firstBreak = src.indexOf("\n");
+  // 选项只认首行；换行之后的内容一律是正文
+  const inOptionZone = (j: number) =>
+    j < tokens.length && (firstBreak === -1 || (tokens[j].index ?? 0) < firstBreak);
   const out: QuoteArgs = {
     count: 1,
     reply: false,
@@ -411,6 +418,17 @@ function parseArgs(text: string): QuoteArgs {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     const lower = arg.toLowerCase();
+
+    if (!inOptionZone(i)) {
+      out.fabricateText = src.slice(tokens[i].index).trim();
+      break;
+    }
+    // 独立的 "--" 显式分隔选项与正文（正文以 r/数字/apple 等选项词开头时使用）
+    if (arg === "--") {
+      const rest = src.slice((tokens[i].index ?? 0) + 2).trim();
+      if (rest) out.fabricateText = rest;
+      break;
+    }
 
     if (lower === "r" || lower === "reply") {
       out.reply = true;
@@ -454,7 +472,7 @@ function parseArgs(text: string): QuoteArgs {
       continue;
     }
     if (lower === "scale" || lower === "s") {
-      const next = args[i + 1];
+      const next = inOptionZone(i + 1) && args[i + 1] !== "--" ? args[i + 1] : undefined;
       const s = next ? Number(next) : NaN;
       if (Number.isFinite(s) && s > 0) {
         out.scale = Math.min(20, Math.max(1, s));
@@ -470,7 +488,7 @@ function parseArgs(text: string): QuoteArgs {
       continue;
     }
     if (lower === "bg" || lower === "color" || lower === "background") {
-      const next = args[i + 1];
+      const next = inOptionZone(i + 1) && args[i + 1] !== "--" ? args[i + 1] : undefined;
       if (next && isColorToken(next)) {
         out.backgroundColor = normalizeColorToken(next);
         out.color = out.backgroundColor;
@@ -478,7 +496,7 @@ function parseArgs(text: string): QuoteArgs {
       }
       continue;
     }
-    if (isColorToken(arg)) {
+    if (isColorToken(arg, false)) {
       out.backgroundColor = normalizeColorToken(arg);
       out.color = out.backgroundColor;
       continue;
@@ -502,7 +520,7 @@ function parseArgs(text: string): QuoteArgs {
 
     // Not a known flag → part of fabricate text (造谣模式)
     // collect all remaining tokens as the custom message text
-    out.fabricateText = args.slice(i).join(" ");
+    out.fabricateText = src.slice(tokens[i].index).trim();
     break;
   }
 
@@ -511,9 +529,7 @@ function parseArgs(text: string): QuoteArgs {
 }
 
 function wantsQuoteHelp(argsText: string): boolean {
-  const t = argsText.trim().toLowerCase();
-  if (!t) return false;
-  return /^(help|\?|h|帮助)$/i.test(t) || /(?:^|\s)(help|\?|帮助)(?:\s|$)/i.test(t);
+  return /^(help|\?|h|帮助)$/i.test(argsText.trim());
 }
 
 function foldSection(title: string, body: string): string {
@@ -574,6 +590,8 @@ function buildQuoteHelpText(): string {
         `<code>${cmd} r 3</code>`,
         `<code>${cmd} stories #231d2b/#372e44</code>`,
         `<code>${cmd} image r hidden scale 3</code>`,
+        `<code>${cmd} 任意文字</code> - 造谣：以被回复者身份显示自定义文字（保留换行）`,
+        `<code>${cmd} r -- 2 个人</code> - 正文以选项词开头时，用 <code>--</code> 或换行与选项分隔`,
         `<code>${cmd} help</code> - 显示本帮助`,
       ].join("\n"),
     ),
